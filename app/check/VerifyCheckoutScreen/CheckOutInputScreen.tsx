@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface CheckOutInputScreenProps {
   accessCode: string;
@@ -19,6 +19,7 @@ export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
   onScanQR,
   onBack,
 }) => {
+  const [showCode, setShowCode] = useState(false);
   const isCodeEntered = accessCode.trim().length > 0;
 
   return (
@@ -93,21 +94,42 @@ export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
         <form onSubmit={onVerify} style={styles.form}>
           <div style={styles.inputGroup}>
             <label style={styles.inputLabel}>Access Code</label>
-            <input
-              type="text"
-              placeholder="Enter access code"
-              value={accessCode}
-              onChange={onCodeChange}
-              disabled={isVerifying}
-              style={{
-                ...styles.input,
-                ...(codeStatus === 'invalid'
-                  ? styles.inputInvalid
-                  : codeStatus === 'already_checked_out'
-                  ? styles.inputAlreadyCheckedOut
-                  : styles.inputNormal),
-              }}
-            />
+            <div style={styles.inputWrapper}>
+              <input
+                type={showCode ? 'text' : 'password'}
+                placeholder="Enter access code"
+                value={accessCode}
+                onChange={onCodeChange}
+                disabled={isVerifying}
+                style={{
+                  ...styles.input,
+                  paddingRight: '48px',
+                  ...(codeStatus === 'invalid'
+                    ? styles.inputInvalid
+                    : codeStatus === 'already_checked_out'
+                    ? styles.inputAlreadyCheckedOut
+                    : styles.inputNormal),
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCode(!showCode)}
+                style={styles.eyeBtn}
+                aria-label={showCode ? 'Hide access code' : 'Show access code'}
+              >
+                {showCode ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                )}
+              </button>
+            </div>
             {codeStatus === 'invalid' && (
               <span style={styles.invalidSubtext}>Access code is invalid.</span>
             )}
@@ -287,6 +309,24 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '8px',
+  },
+  inputWrapper: {
+    position: 'relative',
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: '14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#64748b',
   },
   inputLabel: {
     fontSize: '15px',

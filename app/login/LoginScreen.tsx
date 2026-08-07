@@ -1,17 +1,33 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 
 interface LoginScreenProps {
   onLoginSuccess?: (phone: string) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
+interface LoginFormInputs {
+  phoneNumber: string;
+  password: string;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const [showPassword, setShowPassword] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormInputs>({
+    mode: 'onTouched',
+    defaultValues: {
+      phoneNumber: '',
+      password: '',
+    },
+  });
+
+  const onSubmit = (data: LoginFormInputs) => {
     if (onLoginSuccess) {
-      onLoginSuccess(phoneNumber);
+      onLoginSuccess(data.phoneNumber);
     }
   };
 
@@ -42,30 +58,73 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         <div style={styles.content}>
           <h1 style={styles.title}>Welcome to Gate Staff</h1>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
+          <form onSubmit={handleSubmit(onSubmit)} style={styles.form} noValidate>
+            {/* Phone Number Field */}
             <div style={styles.inputGroup}>
               <input
                 type="tel"
                 placeholder="Phone number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                style={styles.input}
-                required
+                style={{
+                  ...styles.input,
+                  borderColor: errors.phoneNumber ? '#dc2626' : '#8dbba7',
+                }}
+                {...register('phoneNumber', {
+                  required: 'Phone number is required',
+                  pattern: {
+                    value: /^[0-9+\s-]{7,15}$/,
+                    message: 'Please enter a valid phone number',
+                  },
+                })}
               />
+              {errors.phoneNumber && (
+                <span style={styles.errorMsg}>{errors.phoneNumber.message}</span>
+              )}
             </div>
 
+            {/* Password Field */}
             <div style={styles.inputGroup}>
-              <input
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={styles.input}
-                required
-              />
+              <div style={styles.passwordWrapper}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter password"
+                  style={{
+                    ...styles.input,
+                    paddingRight: '48px',
+                    borderColor: errors.password ? '#dc2626' : '#8dbba7',
+                  }}
+                  {...register('password', {
+                    required: 'Password is required',
+                    minLength: {
+                      value: 6,
+                      message: 'Password must be at least 6 characters',
+                    },
+                  })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={styles.eyeBtn}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <span style={styles.errorMsg}>{errors.password.message}</span>
+              )}
             </div>
 
-            <button type="submit" style={styles.submitBtn}>
+            <button type="submit" disabled={isSubmitting} style={styles.submitBtn}>
               Log In
             </button>
           </form>
@@ -139,6 +198,34 @@ const styles: Record<string, React.CSSProperties> = {
   },
   inputGroup: {
     width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  errorMsg: {
+    fontSize: '13px',
+    color: '#dc2626',
+    fontWeight: 500,
+    marginTop: '2px',
+    paddingLeft: '4px',
+  },
+  passwordWrapper: {
+    position: 'relative',
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: '14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#64748b',
   },
   input: {
     width: '100%',
