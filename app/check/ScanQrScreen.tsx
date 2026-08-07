@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import jsQR from 'jsqr';
 
 interface ScanQrScreenProps {
   onCancel?: () => void;
@@ -8,6 +9,51 @@ interface ScanQrScreenProps {
 
 type ScanStatus = 'scanning' | 'verifying' | 'expired' | 'used';
 
+
+export const extractAccessCode = (raw: string): string => {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+
+  // Try URL parsing
+  try {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const url = new URL(trimmed);
+      const codeParam =
+        url.searchParams.get('code') ||
+        url.searchParams.get('accessCode') ||
+        url.searchParams.get('id') ||
+        url.searchParams.get('pass');
+      if (codeParam) return codeParam.trim().toUpperCase();
+
+      const segments = url.pathname.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        return segments[segments.length - 1].trim().toUpperCase();
+      }
+    }
+  } catch {
+    // Ignore invalid URL
+  }
+
+  // Try JSON parsing
+  try {
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      const parsed = JSON.parse(trimmed);
+      const val = parsed.code || parsed.accessCode || parsed.id || parsed.passCode;
+      if (val) return String(val).trim().toUpperCase();
+    }
+  } catch {
+    // Ignore invalid JSON
+  }
+
+  // Handle prefix like CODE:005UHJ9 or PASS-005UHJ9
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':');
+    return parts[parts.length - 1].trim().toUpperCase();
+  }
+
+  return trimmed.toUpperCase();
+};
+
 export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
   onCancel,
   onSuccess,
@@ -15,11 +61,143 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
 }) => {
   const [status, setStatus] = useState<ScanStatus>('scanning');
   const [scannedCode, setScannedCode] = useState('005UHJ9');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  // Helper to trigger scan simulation with a specific code
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Helper to trigger scan with a specific code
   const triggerScan = (codeToScan: string) => {
-    setScannedCode(codeToScan.toUpperCase());
+    stopCamera();
+    const cleanCode = extractAccessCode(codeToScan);
+    setScannedCode(cleanCode || '005UHJ9');
     setStatus('verifying');
+  };
+
+  const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  // Start Camera and Video Decoding Loop
+  useEffect(() => {
+    let active = true;
+
+    if (status !== 'scanning') {
+      stopCamera();
+      return;
+    }
+
+    const startCamera = async () => {
+      setCameraError(null);
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Camera access is not supported on this browser context.');
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+        });
+
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setIsCameraActive(true);
+        }
+
+        // Real-time canvas scanning loop
+        const scanFrame = () => {
+          if (!active || status !== 'scanning') return;
+
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+
+          if (video && video.readyState === video.HAVE_ENOUGH_DATA && canvas) {
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+              });
+
+              if (qrCode && qrCode.data) {
+                triggerScan(qrCode.data);
+                return;
+              }
+            }
+          }
+
+          animationFrameRef.current = requestAnimationFrame(scanFrame);
+        };
+
+        animationFrameRef.current = requestAnimationFrame(scanFrame);
+      } catch (err: any) {
+        if (active) {
+          console.warn('Camera initiation note:', err);
+          setCameraError(
+            err.message || 'Camera permission denied or camera unavailable.'
+          );
+          setIsCameraActive(false);
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      active = false;
+      stopCamera();
+    };
+  }, [status]);
+
+  // Handle uploaded QR Code image file
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, img.width, img.height);
+          const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+          if (qrCode && qrCode.data) {
+            triggerScan(qrCode.data);
+          } else {
+            alert('Could not detect a valid QR code in the selected image. Please try another image.');
+          }
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => {
@@ -44,6 +222,18 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
   return (
     <div style={styles.mobileShell}>
       <div style={styles.container}>
+        {/* Hidden Canvas for Decoding Frames */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+        {/* Hidden File Input for QR Image Upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+        />
+
         {/* Header Logo */}
         <div style={styles.header}>
           <div style={styles.logoRow}>
@@ -67,12 +257,27 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
         {/* SCANNING CAMERA VIEWPORT (IMAGE 1) */}
         {status === 'scanning' && (
           <div style={styles.viewportContent}>
-            {/* Dark Camera Viewport Container with Corner Brackets & Laser */}
+            {/* Camera Viewport Container with Video Feed, Corner Brackets & Laser */}
             <div
               style={styles.cameraBox}
               onClick={() => triggerScan('005UHJ9')}
-              title="Click to simulate QR code scan"
+              title="Point camera at QR code or click to simulate scan"
             >
+              {/* Real Video Stream Feed */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: '24px',
+                  display: isCameraActive ? 'block' : 'none',
+                }}
+              />
+
               {/* Corner Frame Brackets */}
               <div style={{ ...styles.bracket, top: 24, left: 24, borderTop: '3.5px solid #ffffff', borderLeft: '3.5px solid #ffffff' }} />
               <div style={{ ...styles.bracket, top: 24, right: 24, borderTop: '3.5px solid #ffffff', borderRight: '3.5px solid #ffffff' }} />
@@ -83,15 +288,32 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
               <div style={styles.laserLine} />
             </div>
 
-            <p style={styles.subtitle}>Point camera at the guest's QR code</p>
+            <p style={styles.subtitle}>
+              {isCameraActive
+                ? "Point camera at the guest's QR code"
+                : cameraError
+                  ? "Camera offline — click below to upload an image or simulate scan"
+                  : "Initializing camera..."}
+            </p>
 
             {/* Code auto-fills box */}
             <div style={styles.autoFillBox}>
-              <span style={styles.autoFillText}>Code auto-fills from scan...</span>
+              <span style={styles.autoFillText}>
+                {isCameraActive
+                  ? "Scanning live... code auto-fills"
+                  : "Code auto-fills from scan..."}
+              </span>
             </div>
 
-            {/* Simulation Shortcuts Bar for Testing Scan Outcomes */}
+            {/* Actions & Simulation Bar */}
             <div style={styles.simBar}>
+              <button
+                type="button"
+                style={styles.uploadPill}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload QR Image
+              </button>
               <button
                 type="button"
                 style={styles.simPill}
@@ -197,8 +419,8 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
                 ...(status === 'expired'
                   ? styles.resultExpiredBox
                   : status === 'used'
-                  ? styles.resultUsedBox
-                  : styles.resultNormalBox),
+                    ? styles.resultUsedBox
+                    : styles.resultNormalBox),
               }}
             >
               <span
@@ -208,8 +430,8 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
                     status === 'expired'
                       ? '#dc2626'
                       : status === 'used'
-                      ? '#8c7329'
-                      : '#347357',
+                        ? '#8c7329'
+                        : '#347357',
                 }}
               >
                 {scannedCode}
@@ -375,6 +597,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 600,
+    cursor: 'pointer',
+  },
+  uploadPill: {
+    border: '1px solid #347357',
+    backgroundColor: '#e6f4ed',
+    color: '#347357',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 700,
     cursor: 'pointer',
   },
   cancelBtn: {
