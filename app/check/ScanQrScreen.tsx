@@ -305,35 +305,14 @@ export const ScanQrScreen: React.FC<ScanQrScreenProps> = ({
               </span>
             </div>
 
-            {/* Actions & Simulation Bar */}
-            <div style={styles.simBar}>
+            {/* Upload QR Image Action */}
+            <div style={styles.uploadContainer}>
               <button
                 type="button"
-                style={styles.uploadPill}
+                style={styles.uploadBtn}
                 onClick={() => fileInputRef.current?.click()}
               >
                 Upload QR Image
-              </button>
-              <button
-                type="button"
-                style={styles.simPill}
-                onClick={() => triggerScan('005UHJ9')}
-              >
-                Scan Valid
-              </button>
-              <button
-                type="button"
-                style={styles.simPill}
-                onClick={() => triggerScan('005UHJ9-INV')}
-              >
-                {mode === 'check-out' ? 'Scan Invalid' : 'Scan Expired'}
-              </button>
-              <button
-                type="button"
-                style={styles.simPill}
-                onClick={() => triggerScan('005UHJ9-OUT')}
-              >
-                {mode === 'check-out' ? 'Scan Checked Out' : 'Scan Used'}
               </button>
             </div>
 
@@ -584,30 +563,21 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#94a3b8',
     fontWeight: 400,
   },
-  simBar: {
+  uploadContainer: {
     display: 'flex',
-    gap: '8px',
+    justifyContent: 'center',
     marginBottom: '24px',
   },
-  simPill: {
-    border: 'none',
-    backgroundColor: '#f1f5f9',
-    color: '#475569',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '12px',
+  uploadBtn: {
+    border: '1.5px solid #347357',
+    backgroundColor: '#f4faf7',
+    color: '#347357',
+    padding: '10px 20px',
+    borderRadius: '10px',
+    fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-  },
-  uploadPill: {
-    border: '1px solid #347357',
-    backgroundColor: '#e6f4ed',
-    color: '#347357',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    fontSize: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   cancelBtn: {
     background: 'none',
