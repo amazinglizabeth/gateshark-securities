@@ -1,0 +1,37 @@
+{
+  "name": "Gateshark Securities",
+  "short_name": "Securities",
+  "description": "Gateshark Securities Web Application",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#347357",
+  "theme_color": "#347357",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/gateshark-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/gateshark-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/gateshark-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/gateshark-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
