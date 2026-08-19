@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 
 interface CheckInInputScreenProps {
   accessCode: string;
@@ -8,6 +9,10 @@ interface CheckInInputScreenProps {
   onVerify: (e: React.FormEvent) => void;
   onScanQR: () => void;
   onBack?: () => void;
+}
+
+interface CheckInFormInputs {
+  accessCode: string;
 }
 
 export const CheckInInputScreen: React.FC<CheckInInputScreenProps> = ({
@@ -20,7 +25,25 @@ export const CheckInInputScreen: React.FC<CheckInInputScreenProps> = ({
   onBack,
 }) => {
   const [showCode, setShowCode] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CheckInFormInputs>({
+    mode: 'onTouched',
+    values: {
+      accessCode: accessCode || '',
+    },
+  });
+
   const isCodeEntered = accessCode.trim().length > 0;
+
+  const onSubmitForm = (_data: CheckInFormInputs, e?: React.BaseSyntheticEvent) => {
+    if (e) {
+      onVerify(e as unknown as React.FormEvent);
+    }
+  };
 
   return (
     <div style={styles.mobileShell}>
@@ -91,25 +114,31 @@ export const CheckInInputScreen: React.FC<CheckInInputScreenProps> = ({
         </div>
 
         {/* Access Code Form */}
-        <form onSubmit={onVerify} style={styles.form}>
+        <form onSubmit={handleSubmit(onSubmitForm)} style={styles.form} noValidate>
           <div style={styles.inputGroup}>
             <label style={styles.inputLabel}>Access Code</label>
             <div style={styles.inputWrapper}>
               <input
                 type={showCode ? 'text' : 'password'}
                 placeholder="Enter access code"
-                value={accessCode}
-                onChange={onCodeChange}
                 disabled={isVerifying}
                 style={{
                   ...styles.input,
                   paddingRight: '48px',
-                  ...(codeStatus === 'expired'
+                  ...(errors.accessCode || codeStatus === 'expired'
                     ? styles.inputExpired
                     : codeStatus === 'used'
                     ? styles.inputUsed
                     : styles.inputNormal),
                 }}
+                {...register('accessCode', {
+                  required: 'Access code is required',
+                  minLength: {
+                    value: 4,
+                    message: 'Access code must be at least 4 characters',
+                  },
+                  onChange: (e) => onCodeChange(e),
+                })}
               />
               <button
                 type="button"
@@ -130,10 +159,13 @@ export const CheckInInputScreen: React.FC<CheckInInputScreenProps> = ({
                 )}
               </button>
             </div>
-            {codeStatus === 'expired' && (
+            {errors.accessCode && (
+              <span style={styles.expiredSubtext}>{errors.accessCode.message}</span>
+            )}
+            {!errors.accessCode && codeStatus === 'expired' && (
               <span style={styles.expiredSubtext}>Access code is expired.</span>
             )}
-            {codeStatus === 'used' && (
+            {!errors.accessCode && codeStatus === 'used' && (
               <span style={styles.usedSubtext}>Access code has been used.</span>
             )}
           </div>

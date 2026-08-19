@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 
 interface CheckOutInputScreenProps {
   accessCode: string;
@@ -8,6 +9,10 @@ interface CheckOutInputScreenProps {
   onVerify: (e: React.FormEvent) => void;
   onScanQR: () => void;
   onBack?: () => void;
+}
+
+interface CheckOutFormInputs {
+  accessCode: string;
 }
 
 export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
@@ -20,7 +25,25 @@ export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
   onBack,
 }) => {
   const [showCode, setShowCode] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CheckOutFormInputs>({
+    mode: 'onTouched',
+    values: {
+      accessCode: accessCode || '',
+    },
+  });
+
   const isCodeEntered = accessCode.trim().length > 0;
+
+  const onSubmitForm = (_data: CheckOutFormInputs, e?: React.BaseSyntheticEvent) => {
+    if (e) {
+      onVerify(e as unknown as React.FormEvent);
+    }
+  };
 
   return (
     <div style={styles.mobileShell}>
@@ -91,25 +114,31 @@ export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
         </div>
 
         {/* Access Code Form */}
-        <form onSubmit={onVerify} style={styles.form}>
+        <form onSubmit={handleSubmit(onSubmitForm)} style={styles.form} noValidate>
           <div style={styles.inputGroup}>
             <label style={styles.inputLabel}>Access Code</label>
             <div style={styles.inputWrapper}>
               <input
                 type={showCode ? 'text' : 'password'}
                 placeholder="Enter access code"
-                value={accessCode}
-                onChange={onCodeChange}
                 disabled={isVerifying}
                 style={{
                   ...styles.input,
                   paddingRight: '48px',
-                  ...(codeStatus === 'invalid'
+                  ...(errors.accessCode || codeStatus === 'invalid'
                     ? styles.inputInvalid
                     : codeStatus === 'already_checked_out'
                     ? styles.inputAlreadyCheckedOut
                     : styles.inputNormal),
                 }}
+                {...register('accessCode', {
+                  required: 'Access code is required',
+                  minLength: {
+                    value: 4,
+                    message: 'Access code must be at least 4 characters',
+                  },
+                  onChange: (e) => onCodeChange(e),
+                })}
               />
               <button
                 type="button"
@@ -130,10 +159,13 @@ export const CheckOutInputScreen: React.FC<CheckOutInputScreenProps> = ({
                 )}
               </button>
             </div>
-            {codeStatus === 'invalid' && (
+            {errors.accessCode && (
+              <span style={styles.invalidSubtext}>{errors.accessCode.message}</span>
+            )}
+            {!errors.accessCode && codeStatus === 'invalid' && (
               <span style={styles.invalidSubtext}>Access code is invalid.</span>
             )}
-            {codeStatus === 'already_checked_out' && (
+            {!errors.accessCode && codeStatus === 'already_checked_out' && (
               <span style={styles.alreadyCheckedOutSubtext}>Resident is already checked out.</span>
             )}
           </div>
